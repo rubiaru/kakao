@@ -2,7 +2,9 @@ var Swagger = require('swagger-client');
 var open = require('open');
 var rp = require('request-promise');
 var log = require('./db/log');
+var key = require('./db/key');
 var restify = require('restify');
+
 const restifyPlugins = require('restify-plugins');
 
 require('dotenv').config();
@@ -12,6 +14,7 @@ var pollInterval = 1000;
 var directLineSecret = process.env.directLineSecret;
 var directLineClientName = 'DirectLineClient';
 var directLineSpecUrl = 'https://docs.botframework.com/en-us/restapi/directline3/swagger.json';
+var directClient = null;
 
 var directLineClient = rp(directLineSpecUrl)
     .then(function (spec) {
@@ -24,7 +27,7 @@ var directLineClient = rp(directLineSpecUrl)
     .then(function (client) {
         // add authorization header to client
         client.clientAuthorizations.add('AuthorizationBotConnector', new Swagger.ApiKeyAuthorization('Authorization', 'Bearer ' + directLineSecret, 'header'));
-        return client;
+        directClient = client;
     })
     .catch(function (err) {
         console.error('Error initializing DirectLine client', err);
@@ -191,6 +194,51 @@ server.post('/message', function(request, response, next) {
         // var msg = request.body.content;
         console.log(request.toString());
         var msg = JSON.stringify(request.body);
+        log.Log(msg, function() {
+            console.log("kakao msg received" + msg);
+        });
+        console.log(`msg ${msg}`);
+        console.log(`request.body.user_key ${request.body.user_key}`);
+        var userKey = request.body.user_key;
+        var input = request.body.content;
+        var conversationId = key.Get(userKey)
+        console.log(`conversationId ${conversationId}`);
+        if (conversationId == null) {
+            // // create conversation
+            directClient.Conversations.Conversations_StartConversation()    
+                .then(function (response) {
+                    conversationId = response.obj.conversationId;
+                    key.Set(userKey, conversationId, function() { 
+                        console.log('conversationId Create'
+                            + userKey + ", " 
+                            + conversationId); });                    
+                })                                                             
+                .catch(function (err) {
+                    console.error('Error starting conversation', err);
+                });        
+        } 
+        // restify - async 
+        directClient.Conversations.Conversations_PostActivity(
+            {
+                conversationId: conversationId,
+                activity: {
+                    textFormat: 'plain',
+                    text: input,
+                    type: 'message',
+                    from: {
+                        id: directLineClientName,
+                        name: directLineClientName
+                    }
+                }
+            })
+            .then(function (response) {
+                log.Log(response, function() {
+                    console.log("post received" + response);
+                });
+            })
+            .catch(function (err) {
+                console.error('Error sending message:', err);
+            });
         
         log.Log(msg, function() { console.log('log callback'); })
         response.send(201, { text: 'message received' });
@@ -201,7 +249,11 @@ server.post('/message', function(request, response, next) {
 server.listen(port, function() { 
         console.log('서버 가동중... in ' + port); 
         log.Init(function() {
-            console.log('카카오 디비 초기화 성공');
+            console.log('카카오 로그 초기화 성공');
+        });
+
+        key.Init(function() {
+            console.log('레디스 캐쉬 초기화 성공');
         });
     }
 );
