@@ -197,47 +197,57 @@ server.post('/message', function(request, response, next) {
         log.Log(msg, function() {
             console.log("kakao msg received" + msg);
         });
-        console.log(`msg ${msg}`);
-        console.log(`request.body.user_key ${request.body.user_key}`);
+        console.log(`1) msg ${msg}`);
+        console.log(`2) request.body.user_key ${request.body.user_key}`);
         var userKey = request.body.user_key;
         var input = request.body.content;
-        var conversationId = key.Get(userKey)
-        console.log(`conversationId ${conversationId}`);
+        var conversationId = key.Get(userKey);            
+        console.log(`3) conversationId ${conversationId}`);
+        log.Log(`4) searched conversationId ${conversationId}`, function() {
+            console.log(`5) searched conversationId ${conversationId}`);
+        });
         if (conversationId == null) {
             // // create conversation
             directClient.Conversations.Conversations_StartConversation()    
                 .then(function (response) {
                     conversationId = response.obj.conversationId;
                     key.Set(userKey, conversationId, function() { 
-                        console.log('conversationId Create'
+                        log.Log('conversationId Create'
                             + userKey + ", " 
-                            + conversationId); });                    
+                            + conversationId, function() {
+                                console.log('6) conversationId Create'
+                                + userKey + ", " 
+                                + conversationId);
+                            });
+                     });                    
                 })                                                             
                 .catch(function (err) {
                     console.error('Error starting conversation', err);
                 });        
         } 
-        // restify - async 
-        directClient.Conversations.Conversations_PostActivity(
-            {
-                conversationId: conversationId,
-                activity: {
-                    textFormat: 'plain',
-                    text: input,
-                    type: 'message',
-                    from: {
-                        id: directLineClientName,
-                        name: directLineClientName
-                    }
+        
+        var postMsg = {
+            conversationId: conversationId,
+            activity: {
+                textFormat: 'plain',
+                text: input,
+                type: 'message',
+                from: {
+                    id: directLineClientName,
+                    name: directLineClientName
                 }
-            })
+            }
+        };
+        console.log(`postMsg ${JSON.stringify(postMsg)}`);
+        // restify - async 
+        directClient.Conversations.Conversations_PostActivity(postMsg)
             .then(function (response) {
                 log.Log(response, function() {
-                    console.log("post received" + response);
+                    console.log("7) post received" + response);
                 });
             })
             .catch(function (err) {
-                console.error('Error sending message:', err);
+                console.error('8) Error sending message:', err);
             });
         
         log.Log(msg, function() { console.log('log callback'); })

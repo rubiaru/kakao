@@ -11,11 +11,12 @@ function Init(callback) {
 }
   
 function Get(userKey, callback) {  
+    var conversationId = null;
     redisClient.get(userKey, (err, reply) => {
         console.log(`key Get ${reply}`);
-        return reply;
+        conversationId = reply;
         });
-    return null;
+    return conversationId;
 };
 
 function Set(userKey, conversationId, callback) {  
