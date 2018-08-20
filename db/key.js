@@ -13,22 +13,29 @@ function Init(callback) {
 function Get(userKey, callback) {  
     var conversationId = null;
     redisClient.get(userKey, (err, reply) => {
-        console.log(`key Get ${reply}`);
-        conversationId = reply;
+        if(err){            
+            console.log(`key Get error ${err}`);
+            conversationId = null;    
+        } else {
+            console.log(`key Get value ${reply}`);
+            conversationId = reply;
+        }
         });
     return conversationId;
 };
 
 function Set(userKey, conversationId, callback) {  
+    var setResult = null;
     redisClient.set(userKey, conversationId, (err, reply) => {    
         if(err){
-            console.log(err);
-            res.send("error "+err);
-            return null;
+            console.log(`key Set error ${err}`);
+            var setResult = null;
+        } else {
+            console.log(`key Set result ${reply}`);
+            var setResult = reply;
         }
-        return reply;
     });   
-    return null;   
+    return setResult;   
 };
 
 exports.Init = Init;
