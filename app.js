@@ -51,7 +51,7 @@ function pollMessages(client, conversationId, kakaoResponse ) {
                         // 현재 읽어 올 수 있는 액티비티를 모아서 전송
                         activities.forEach(function(activity) {
                             if (activity.text) {
-                                tempMsg += activity.text;
+                                tempMsg = activity.text;
                             }
                         });            
                         
