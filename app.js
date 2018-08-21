@@ -68,6 +68,7 @@ function pollMessages(client, conversationId, kakaoResponse ) {
                                 "text": tempMsg
                             }
                         };     
+                        log.Log(responseMsg, function() { console.log(responseMsg); });
                         kakaoResponse.send(responseMsg);  
                         kakaoResponse.end();
                     } 
