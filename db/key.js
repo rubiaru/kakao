@@ -10,21 +10,16 @@ function Init(callback) {
     callback();
 }
   
-function Get(userKey, callback) {  
-    var conversationId = null;
-    redisClient.get(userKey, (err, reply) => {
+function Get(userKey, callback) {      
+    redisClient.get(userKey, (err, conversationId) => {
         if(err){            
             console.log(`key Get error ${err}`);
             conversationId = null;    
         } else {
-            console.log(`key Get value ${reply}`);
-            conversationId = reply;
+            console.log(`key Get value ${conversationId}`);          
+            callback(conversationId);
         }
         });
-
-    callback(conversationId);
-
-    return conversationId;
 };
 
 function Set(userKey, conversationId, callback) {  
@@ -36,9 +31,10 @@ function Set(userKey, conversationId, callback) {
         } else {
             console.log(`key Set result ${reply}`);
             var setResult = reply;
+            callback();
         }
     });   
-    callback();
+    
     return setResult;   
 };
 

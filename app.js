@@ -6,7 +6,7 @@ var key = require('./db/key');
 var restify = require('restify');
 
 const restifyPlugins = require('restify-plugins');
-
+var watermark = null; 
 require('dotenv').config();
 
 // config items
@@ -33,11 +33,12 @@ var directLineClient = rp(directLineSpecUrl)
         console.error('루이스 연결을 위한 DirectLine client 초기화 중 에러 발생:', err);
     });
 
+
 function pollMessages(client, conversationId, kakaoResponse ) {
 
     console.log(`pollMessages conversationId ${conversationId}`);
 
-    var watermark = null;
+    // var watermark = null;
     var tempMsg = "";
     getActiviteis = setInterval(function () {
         console.log('pollMessages conversationId setInterval called');
@@ -119,12 +120,16 @@ server.post('/message', function(request, response, next) {
         var msg = JSON.stringify(request.body);        
         log.Log(msg, function() {
             console.log("kakao msg received " + msg);
-        });
-        console.log(`1) msg ${msg}`);  
+        });        
+        
         var userKey = request.body.user_key;
         var input = request.body.content;
+
+        console.log(`1) msg ${msg}`);  
+        console.log(`2) userKey ${userKey}`);  
+
         key.Get(userKey, function(conversationId) {
-            //console.log(`key.Get callback ${conversationId}`);
+            console.log(`key.Get callback conversationId: ${conversationId}`);
             checkConversationID(conversationId, function(conversationId){
                 //console.log(`checkConversationID callback ${conversationId}`);
                 key.Set(userKey, conversationId, function() { 
@@ -142,7 +147,9 @@ server.post('/message', function(request, response, next) {
     }
 );
 function checkConversationID(conversationId, callback) {
+    console.log(`conversationId ******************** ${conversationId}`);
     if (conversationId == null) {
+        watermark = null;
         console.log('conversationId is null. call Conversations_StartConversation()');                
         directClient.Conversations.Conversations_StartConversation()    
         .then(function (response) {                       
@@ -155,6 +162,7 @@ function checkConversationID(conversationId, callback) {
         });        
     } else {
         console.log(`conversationId is ${conversationId}`);
+        callback(conversationId);    
     }    
 }
 
