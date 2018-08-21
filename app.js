@@ -149,7 +149,7 @@ function checkConversationID(conversationId, callback) {
         callback(conversationId);    
     }    
 }
-
+// 메세지 전송
 function sendMsg(conversationId, input, name, callback) {
     var postMsg = {
         conversationId: conversationId,
