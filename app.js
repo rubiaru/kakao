@@ -18,144 +18,66 @@ var directClient = null;
 
 var directLineClient = rp(directLineSpecUrl)
     .then(function (spec) {
-        // client
+        // DirectLine client
         return new Swagger({
             spec: JSON.parse(spec.trim()),
             usePromise: true
         });
     })
     .then(function (client) {
-        // add authorization header to client
+        // 인증을 위한 헤더 추가
         client.clientAuthorizations.add('AuthorizationBotConnector', new Swagger.ApiKeyAuthorization('Authorization', 'Bearer ' + directLineSecret, 'header'));
         directClient = client;
     })
     .catch(function (err) {
-        console.error('Error initializing DirectLine client', err);
+        console.error('루이스 연결을 위한 DirectLine client 초기화 중 에러 발생:', err);
     });
 
-// once the client is ready, create a new conversation
-/*
-directLineClient.then(function (client) {
-    client.Conversations.Conversations_StartConversation()                          // create conversation
-        .then(function (response) {
-            return response.obj.conversationId;
-        })                            // obtain id
-        .then(function (conversationId) {
-            sendMessagesFromConsole(client, conversationId);                        // start watching console input for sending new messages to bot
-            pollMessages(client, conversationId);                                   // start polling messages from bot
-        })
-        .catch(function (err) {
-            console.error('Error starting conversation', err);
-        });
-});
-*/
+function pollMessages(client, conversationId, kakaoResponse ) {
 
-// Read from console (stdin) and send input to conversation using DirectLine client
-function sendMessagesFromConsole(client, conversationId) {
-    /*
-    var stdin = process.openStdin();
-    process.stdout.write('Command> ');
-    stdin.addListener('data', function (e) {
-        var input = e.toString().trim();
-        if (input) {
-            // exit
-            if (input.toLowerCase() === 'exit') {
-                return process.exit();
-            }
+    console.log(`pollMessages conversationId ${conversationId}`);
 
-            // send message
-            client.Conversations.Conversations_PostActivity(
-                {
-                    conversationId: conversationId,
-                    activity: {
-                        textFormat: 'plain',
-                        text: input,
-                        type: 'message',
-                        from: {
-                            id: directLineClientName,
-                            name: directLineClientName
-                        }
-                    }
-                }).catch(function (err) {
-                    console.error('Error sending message:', err);
-                });
-
-            process.stdout.write('Command> ');
-        }
-    });
-    */
-}
-
-// Poll Messages from conversation using DirectLine client
-function pollMessages(client, conversationId) {
-    /*
-    console.log('Starting polling message for conversationId: ' + conversationId);
     var watermark = null;
-    setInterval(function () {
+    var tempMsg = "";
+    getActiviteis = setInterval(function () {
+        console.log('pollMessages conversationId setInterval called');
+        // directClient
         client.Conversations.Conversations_GetActivities({ conversationId: conversationId, watermark: watermark })
             .then(function (response) {
-                watermark = response.obj.watermark;                                 // use watermark so subsequent requests skip old messages
-                return response.obj.activities;
-            })
-            .then(printMessages);
-    }, pollInterval);
-    */
+                watermark = response.obj.watermark;          
+                // return response.obj.activities;
+                activities = response.obj.activities;
+                console.log(`pollMessages conversationId setInterval watermark ${watermark}`);
+                console.log(`activities ${JSON.stringify(activities)}`);
+                
+                if (activities && activities.length) {
+                    // ignore own messages
+                    activities = activities.filter(function (m) { return m.from.id !== directLineClientName });   
+                    if (activities.length) {
+                        // print other messages
+                        activities.forEach(function(activity) {
+                            if (activity.text) {
+                                tempMsg += activity.text;
+                            }
+                        });            
+                        
+                        clearInterval(getActiviteis);
+                    
+                        var responseMsg = {
+                            "message": {
+                                "text": tempMsg
+                            }
+                        };     
+                        kakaoResponse.send(responseMsg);  
+                        kakaoResponse.end();
+                    } 
+
+                }
+
+            }) ;  
+    }, pollInterval); 
+    
 }
-
-// Helpers methods
-function printMessages(activities) {
-    if (activities && activities.length) {
-        // ignore own messages
-        activities = activities.filter(function (m) { return m.from.id !== directLineClientName });
-
-        if (activities.length) {
-            process.stdout.clearLine();
-            process.stdout.cursorTo(0);
-
-            // print other messages
-            activities.forEach(printMessage);
-
-            process.stdout.write('Command> ');
-        }
-    }
-}
-
-function printMessage(activity) {
-    if (activity.text) {
-        console.log(activity.text);
-    }
-
-    if (activity.attachments) {
-        activity.attachments.forEach(function (attachment) {
-            switch (attachment.contentType) {
-                case "application/vnd.microsoft.card.hero":
-                    renderHeroCard(attachment);
-                    break;
-
-                case "image/png":
-                    console.log('Opening the requested image ' + attachment.contentUrl);
-                    open(attachment.contentUrl);
-                    break;
-            }
-        });
-    }
-}
-
-function renderHeroCard(attachment) {
-    var width = 70;
-    var contentLine = function (content) {
-        return ' '.repeat((width - content.length) / 2) +
-            content +
-            ' '.repeat((width - content.length) / 2);
-    }
-
-    console.log('/' + '*'.repeat(width + 1));
-    console.log('*' + contentLine(attachment.content.title) + '*');
-    console.log('*' + ' '.repeat(width) + '*');
-    console.log('*' + contentLine(attachment.content.text) + '*');
-    console.log('*'.repeat(width + 1) + '/');
-}
-
 
 // Setup Restify Server
 var server = restify.createServer(
@@ -193,69 +115,71 @@ server.get('/keyboard', function (request, response, next) {
 server.post('/message', function(request, response, next) {
         // var msg = request.body.content;
         console.log(request.toString());
-        var msg = JSON.stringify(request.body);
+        var msg = JSON.stringify(request.body);        
         log.Log(msg, function() {
-            console.log("kakao msg received" + msg);
+            console.log("kakao msg received " + msg);
         });
-        console.log(`1) msg ${msg}`);
-        console.log(`2) request.body.user_key ${request.body.user_key}`);
+        console.log(`1) msg ${msg}`);  
         var userKey = request.body.user_key;
         var input = request.body.content;
-        var conversationId = key.Get(userKey);            
-        console.log(`3) conversationId ${conversationId}`);
-        log.Log(`4) searched conversationId ${conversationId}`, function() {
-            console.log(`5) searched conversationId ${conversationId}`);
+        key.Get(userKey, function(conversationId) {
+            //console.log(`key.Get callback ${conversationId}`);
+            checkConversationID(conversationId, function(conversationId){
+                //console.log(`checkConversationID callback ${conversationId}`);
+                key.Set(userKey, conversationId, function() { 
+                    var keyLog = `conversationId Create ${userKey} , ${conversationId}`;
+                    log.Log(keyLog, function() { console.log(keyLog); });
+                    sendMsg(conversationId, input, directLineClientName, function() {
+                    });  
+                    pollMessages(directClient, conversationId, response);
+                    });   
+            });                                       
         });
-        if (conversationId == null) {
-            // // create conversation
-            directClient.Conversations.Conversations_StartConversation()    
-                .then(function (response) {
-                    conversationId = response.obj.conversationId;
-                    key.Set(userKey, conversationId, function() { 
-                        log.Log('conversationId Create'
-                            + userKey + ", " 
-                            + conversationId, function() {
-                                console.log('6) conversationId Create'
-                                + userKey + ", " 
-                                + conversationId);
-                            });
-                     });                    
-                })                                                             
-                .catch(function (err) {
-                    console.error('Error starting conversation', err);
-                });        
-        } 
-        
-        var postMsg = {
-            conversationId: conversationId,
-            activity: {
-                textFormat: 'plain',
-                text: input,
-                type: 'message',
-                from: {
-                    id: directLineClientName,
-                    name: directLineClientName
-                }
-            }
-        };
-        console.log(`postMsg ${JSON.stringify(postMsg)}`);
-        // restify - async 
-        directClient.Conversations.Conversations_PostActivity(postMsg)
-            .then(function (response) {
-                log.Log(response, function() {
-                    console.log("7) post received" + response);
-                });
-            })
-            .catch(function (err) {
-                console.error('8) Error sending message:', err);
-            });
-        
-        log.Log(msg, function() { console.log('log callback'); })
-        response.send(201, { text: 'message received' });
-        response.end();
+
+        //response.send(201, { text: 'message received' });
+        //response.end();
     }
 );
+function checkConversationID(conversationId, callback) {
+    if (conversationId == null) {
+        console.log('conversationId is null. call Conversations_StartConversation()');                
+        directClient.Conversations.Conversations_StartConversation()    
+        .then(function (response) {                       
+            conversationId = response.obj.conversationId;                
+            console.log(`created conversationId is ${conversationId}`);     
+            callback(conversationId);    
+        })                                                       
+        .catch(function (err) {
+            console.error('Error starting conversation', err);
+        });        
+    } else {
+        console.log(`conversationId is ${conversationId}`);
+    }    
+}
 
+function sendMsg(conversationId, input, name, callback) {
+    var postMsg = {
+        conversationId: conversationId,
+        activity: {
+            textFormat: 'plain',
+            text: input,
+            type: 'message',
+            from: {
+                id: name,
+                name: name
+            }
+        }
+    };
+    console.log(`LUIS에 메세지 전송: ${JSON.stringify(postMsg)}`);
+    // restify - async 
+    directClient.Conversations.Conversations_PostActivity(postMsg)
+        .then(function (response) {        
+            callback();
+        })
+        .catch(function (err) {
+            console.error('LUIS에 메세지 전송 중 에러 발생:', err);
+        });                    
+}
 server.listen(port, function() { 
         console.log('서버 가동중... in ' + port); 
         log.Init(function() {

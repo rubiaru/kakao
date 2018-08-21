@@ -21,6 +21,9 @@ function Get(userKey, callback) {
             conversationId = reply;
         }
         });
+
+    callback(conversationId);
+
     return conversationId;
 };
 
@@ -35,6 +38,7 @@ function Set(userKey, conversationId, callback) {
             var setResult = reply;
         }
     });   
+    callback();
     return setResult;   
 };
 
