@@ -35,8 +35,7 @@ var directLineClient = rp(directLineSpecUrl)
 
 
 function pollMessages(client, conversationId, kakaoResponse ) {
-    var watermark = null;
-    var tempMsg = "";
+    var watermark = null;  
     getActiviteis = setInterval(function () {        
         client.Conversations.Conversations_GetActivities({ conversationId: conversationId, watermark: watermark })
             .then(function (response) {
@@ -45,13 +44,16 @@ function pollMessages(client, conversationId, kakaoResponse ) {
                 var activityMsg = `activities: ${JSON.stringify(activities)} + "," + watermark: ${watermark}`;
                 log.Log(activityMsg , function() { console.log(activityMsg); });
                 if (activities && activities.length) {
+                    var tempMsg = "";
                     // 내가 보낸 건 무시
                     activities = activities.filter(function (m) { return m.from.id !== directLineClientName });   
                     if (activities.length) {
-                        // 현재 읽어 올 수 있는 액티비티를 모아서 전송
-                        activities.forEach(function(activity) {
-                            if (activity.text) {
-                                tempMsg = activity.text;
+                        
+                        activities.forEach(function(activity, idx, array) {
+                            if (idx === array.length - 1){ 
+                                //if (activity.text) {
+                                    tempMsg = activity.text;
+                                //}
                             }
                         });            
                         
@@ -178,7 +180,7 @@ server.listen(port, function() {
         });
 
         key.Init(function() {
-            console.log('레디스 캐쉬 초기화 성공');
+            console.log('레디스 캐시 초기화 성공');
         });
     }
 );
