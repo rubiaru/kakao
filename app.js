@@ -6,7 +6,7 @@ var key = require('./db/key');
 var restify = require('restify');
 
 const restifyPlugins = require('restify-plugins');
-var watermark = null; 
+// var watermark = null; 
 require('dotenv').config();
 
 // config items
@@ -18,7 +18,7 @@ var directClient = null;
 
 var directLineClient = rp(directLineSpecUrl)
     .then(function (spec) {
-        // DirectLine client
+        // direct line client
         return new Swagger({
             spec: JSON.parse(spec.trim()),
             usePromise: true
@@ -35,27 +35,20 @@ var directLineClient = rp(directLineSpecUrl)
 
 
 function pollMessages(client, conversationId, kakaoResponse ) {
-
-    console.log(`pollMessages conversationId ${conversationId}`);
-
-    // var watermark = null;
+    var watermark = null;
     var tempMsg = "";
-    getActiviteis = setInterval(function () {
-        console.log('pollMessages conversationId setInterval called');
-        // directClient
+    getActiviteis = setInterval(function () {        
         client.Conversations.Conversations_GetActivities({ conversationId: conversationId, watermark: watermark })
             .then(function (response) {
-                watermark = response.obj.watermark;          
-                // return response.obj.activities;
+                watermark = response.obj.watermark;                          
                 activities = response.obj.activities;
-                console.log(`pollMessages conversationId setInterval watermark ${watermark}`);
-                console.log(`activities ${JSON.stringify(activities)}`);
-                
+                var activityMsg = `activities: ${JSON.stringify(activities)} + "," + watermark: ${watermark}`;
+                log.Log(activityMsg , function() { console.log(activityMsg); });
                 if (activities && activities.length) {
-                    // ignore own messages
+                    // 내가 보낸 건 무시
                     activities = activities.filter(function (m) { return m.from.id !== directLineClientName });   
                     if (activities.length) {
-                        // print other messages
+                        // 현재 읽어 올 수 있는 액티비티를 모아서 전송
                         activities.forEach(function(activity) {
                             if (activity.text) {
                                 tempMsg += activity.text;
@@ -68,8 +61,10 @@ function pollMessages(client, conversationId, kakaoResponse ) {
                             "message": {
                                 "text": tempMsg
                             }
-                        };     
+                        };   
+
                         log.Log(responseMsg, function() { console.log(responseMsg); });
+
                         kakaoResponse.send(responseMsg);  
                         kakaoResponse.end();
                     } 
@@ -108,32 +103,26 @@ server.get('/', function (request, response, next) {
 server.get('/keyboard', function (request, response, next) {
         var keyboardResponse = {
             'type': 'buttons',
-            'buttons': ['오늘날씨알려주세요']
+            'buttons': ['오늘날씨알려주세요','안녕']
         }  
         response.send(keyboardResponse);   
     }   
 );
 
 server.post('/message', function(request, response, next) {
-        // var msg = request.body.content;
-        console.log(request.toString());
+            
         var msg = JSON.stringify(request.body);        
         log.Log(msg, function() {
-            console.log("kakao msg received " + msg);
+            console.log("카카오에서 받은 메세지: " + msg);
         });        
         
         var userKey = request.body.user_key;
-        var input = request.body.content;
+        var input = request.body.content;        
 
-        console.log(`1) msg ${msg}`);  
-        console.log(`2) userKey ${userKey}`);  
-
-        key.Get(userKey, function(conversationId) {
-            console.log(`key.Get callback conversationId: ${conversationId}`);
-            checkConversationID(conversationId, function(conversationId){
-                //console.log(`checkConversationID callback ${conversationId}`);
+        key.Get(userKey, function(conversationId) {            
+            checkConversationID(conversationId, function(conversationId){                
                 key.Set(userKey, conversationId, function() { 
-                    var keyLog = `conversationId Create ${userKey} , ${conversationId}`;
+                    var keyLog = `대화 ID 생성 카카오 키: ${userKey} , 루이스 대화 ID ${conversationId}`;
                     log.Log(keyLog, function() { console.log(keyLog); });
                     sendMsg(conversationId, input, directLineClientName, function() {
                     });  
@@ -141,27 +130,20 @@ server.post('/message', function(request, response, next) {
                     });   
             });                                       
         });
-
-        //response.send(201, { text: 'message received' });
-        //response.end();
     }
 );
-function checkConversationID(conversationId, callback) {
-    console.log(`conversationId ******************** ${conversationId}`);
+function checkConversationID(conversationId, callback) {    
     if (conversationId == null) {
-        watermark = null;
-        console.log('conversationId is null. call Conversations_StartConversation()');                
+        watermark = null;        
         directClient.Conversations.Conversations_StartConversation()    
         .then(function (response) {                       
-            conversationId = response.obj.conversationId;                
-            console.log(`created conversationId is ${conversationId}`);     
+            conversationId = response.obj.conversationId;                            
             callback(conversationId);    
         })                                                       
         .catch(function (err) {
-            console.error('Error starting conversation', err);
+            console.error('대화 시작 중 문제 발생', err);
         });        
-    } else {
-        console.log(`conversationId is ${conversationId}`);
+    } else {        
         callback(conversationId);    
     }    
 }
